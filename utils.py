@@ -9,9 +9,9 @@ DATA = join(HERE, "data")
 WARD_SHAPES = []
 
 
-def get_bmtc_routes():
+def get_bmtc_routes(source="routes.2018.csv"):
     # Read the BMTC Route data
-    return pd.read_csv(join(DATA, "routes.csv"))
+    return pd.read_csv(join(DATA, source))
 
 
 def get_uber_travel_time(quarter="2018-4"):
