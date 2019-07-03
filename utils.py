@@ -7,20 +7,12 @@ from shapely.geometry import shape, Point
 HERE = dirname(abspath(__file__))
 DATA = join(HERE, "data")
 WARD_SHAPES = []
+UBER_TRAVEL_TIMES = None
 
 
 def get_bmtc_routes(source="routes.2018.csv"):
     # Read the BMTC Route data
     return pd.read_csv(join(DATA, source))
-
-
-def get_uber_travel_time(quarter="2018-4"):
-    # Read Travel Time Data provided by Uber
-    # They provide mean travel time between "wards"
-    path = join(
-        DATA, "bangalore-wards-{}-All-HourlyAggregate.csv".format(quarter)
-    )
-    return pd.read_csv(path)
 
 
 def get_wards():
@@ -66,6 +58,49 @@ def route_to_wards(route):
 
     The function de-duplicates wards, and only returns unique wards.
     """
-    bus_stops = json.loads(route.map_json_content)
+    try:
+        bus_stops = json.loads(route.map_json_content)
+    except TypeError:
+        return []
     wards = [get_ward(bus_stop["latlons"]) for bus_stop in bus_stops]
     return sorted(set(wards), key=lambda x: wards.index(x))
+
+
+def read_uber_travel_time():
+    global UBER_TRAVEL_TIMES
+    if not UBER_TRAVEL_TIMES:
+        path = join(DATA, "uber-travel-time-data.json")
+        with open(path) as f:
+            UBER_TRAVEL_TIMES = json.load(f)
+
+    return UBER_TRAVEL_TIMES
+
+
+def mean_time(src, dst):
+    key = "{}-{}".format(src, dst)
+    data = UBER_TRAVEL_TIMES.get(key)
+    if not data:
+        return None
+    data = [day["meanTravelTimeSec"] for day in data[0]["daily"].values()]
+    return sum(data) / len(data)
+
+
+def mean_route_time(wards):
+    pairs = zip(wards[:-1], wards[1:])
+    route_time = 0
+    for (src_id, _), (dst_id, _) in pairs:
+        time = mean_time(src_id, dst_id)
+        if time is not None:
+            route_time += time
+    return route_time
+
+
+def estimate_travel_time(route):
+    read_uber_travel_time()
+    wards = route_to_wards(route)
+    means = pd.Series(mean_route_time(wards))
+    missing_data = means.hasnans
+    total_minutes = int(means.sum() / 60)
+    hours = int(total_minutes / 60)
+    minutes = total_minutes % 60
+    return (hours, minutes), missing_data
