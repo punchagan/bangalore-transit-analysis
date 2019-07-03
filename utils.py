@@ -23,10 +23,16 @@ def get_uber_travel_time(quarter="2018-4"):
     return pd.read_csv(path)
 
 
-def get_ward_shapes():
+def get_wards():
     # Read the ward boundaries data from Uber
     with open(join(DATA, "bangalore_wards.json")) as f:
         wards = json.load(f)
+
+    return wards
+
+
+def get_ward_shapes():
+    wards = get_wards()
     ward_shapes = [
         (
             shape(feature["geometry"]),
